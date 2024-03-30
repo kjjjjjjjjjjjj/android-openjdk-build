@@ -26,7 +26,7 @@ fi
 
 export JVM_PLATFORM=linux
 # Set NDK
-export API=24
+export API=21
 if [[ -z "$ANDROID_NDK_ROOT" ]]; then
   export NDK=$PWD/android-ndk-$NDK_VERSION
   export ANDROID_NDK_ROOT=$NDK
