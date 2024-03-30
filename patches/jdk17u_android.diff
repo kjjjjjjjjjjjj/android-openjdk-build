@@ -336,8 +336,8 @@ index 3c9d1055f..e4260da69 100644
  
  ################################################################################
  
--ifeq ($(call isTargetOs, linux macosx), true)
-+ifeq ($(call isTargetOs, linux macosx android), true)
+-ifeq ($(call isTargetOs, linux macosx windows), true)
++ifeq ($(call isTargetOs, linux macosx windows android), true)
  
    $(eval $(call SetupJdkLibrary, BUILD_LIBEXTNET, \
        NAME := extnet, \
@@ -2310,7 +2310,7 @@ index 9df8be1e6..12f9b4de3 100644
  typedef int futimens_func(int, const struct timespec *);
  typedef int lutimes_func(const char *, const struct timeval *);
  typedef DIR* fdopendir_func(int);
-@@ -149,13 +150,49 @@ static fstatat64_func* my_fstatat64_func = NULL;
+@@ -149,13 +150,48 @@ static fstatat64_func* my_fstatat64_func = NULL;
  static unlinkat_func* my_unlinkat_func = NULL;
  static renameat_func* my_renameat_func = NULL;
  static futimesat_func* my_futimesat_func = NULL;
@@ -2321,7 +2321,6 @@ index 9df8be1e6..12f9b4de3 100644
  #if defined(__linux__)
  static statx_func* my_statx_func = NULL;
  #endif
- 
 +#ifdef __ANDROID__
 +/*
 + * TODO: Android lacks support for the methods listed below.  In it's place are
@@ -2356,7 +2355,7 @@ index 9df8be1e6..12f9b4de3 100644
 +
 +}
 +#endif
-+
+
  /**
   * fstatat missing from glibc on Linux.
   */
@@ -2512,3 +2511,14 @@ index 3fb38893e..20ac7b270 100644
          }
  
          if (codeset == NULL) {
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+index be578a0bb..ce5e8b400 100644
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -80,5 +80,5 @@
+ // not relying on included headers.
+ 
+-#ifndef __GLIBC__
++#if !defined(__GLIBC__) && !defined(__ANDROID__)
+ // Alpine doesn't know these types, define them
+ typedef unsigned int       __uint32_t;
