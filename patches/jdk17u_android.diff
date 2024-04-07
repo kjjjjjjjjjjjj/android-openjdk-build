@@ -4,7 +4,7 @@ index 8f5a5cf52..34943b6ed 100644
 +++ b/make/autoconf/build-aux/config.sub
 @@ -47,7 +47,8 @@ if echo $* | grep pc-msys >/dev/null ; then
  fi
- 
+
  # Filter out everything that doesn't begin with "aarch64-"
 -if ! echo $* | grep '^aarch64-' >/dev/null ; then
 +# or that ends with "-android"
