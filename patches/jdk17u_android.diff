@@ -4,7 +4,7 @@ index 8f5a5cf52..34943b6ed 100644
 +++ b/make/autoconf/build-aux/config.sub
 @@ -47,7 +47,8 @@ if echo $* | grep pc-msys >/dev/null ; then
  fi
- 
+
  # Filter out everything that doesn't begin with "aarch64-"
 -if ! echo $* | grep '^aarch64-' >/dev/null ; then
 +# or that ends with "-android"
@@ -336,8 +336,8 @@ index 3c9d1055f..e4260da69 100644
  
  ################################################################################
  
--ifeq ($(call isTargetOs, linux macosx), true)
-+ifeq ($(call isTargetOs, linux macosx android), true)
+-ifeq ($(call isTargetOs, linux macosx windows), true)
++ifeq ($(call isTargetOs, linux macosx windows android), true)
  
    $(eval $(call SetupJdkLibrary, BUILD_LIBEXTNET, \
        NAME := extnet, \
@@ -1984,6 +1984,52 @@ index 36a08d4c1..a0eca754b 100644
  #if defined(_ALLBSD_SOURCE)
  #if !defined(P_tmpdir)
  #include <paths.h>
+diff --git a/src/java.base/share/native/libjli/java.c b/src/java.base/share/native/libjli/java.c
+index 3b4a15b..1bca2bc 100644
+--- a/src/java.base/share/native/libjli/java.c
++++ b/src/java.base/share/native/libjli/java.c
+@@ -56,6 +56,32 @@
+ #include "java.h"
+ #include "jni.h"
+ 
++#ifdef __ANDROID__
++#include <stdbool.h>
++#include <dlfcn.h>
++static void android_disable_tags() {
++    void *lib_handle = dlopen("libc.so", RTLD_LAZY);
++    if (lib_handle) {
++        if (android_get_device_api_level() >= 31) {
++            int (*mallopt_func)(int, int) = dlsym(lib_handle, "mallopt");
++            if (mallopt_func) {
++                mallopt_func(M_BIONIC_SET_HEAP_TAGGING_LEVEL, 0);
++            }
++            return;
++        }
++        /* android_get_device_api_level() < 31 */
++        bool (*android_mallopt)(int opcode, void* arg, size_t arg_size) = dlsym(lib_handle, "android_mallopt");
++        if (android_mallopt) {
++            int android_malloc_tag_level = 0;
++            android_mallopt(8, &android_malloc_tag_level, sizeof(android_malloc_tag_level));
++        }
++        dlclose(lib_handle);
++    }
++}
++#else
++static void android_disable_tags(){}
++#endif
++
+ /*
+  * A NOTE TO DEVELOPERS: For performance reasons it is important that
+  * the program image remain relatively small until after SelectVersion
+@@ -253,6 +279,8 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argv */
+     _is_java_args = javaargs;
+     _wc_enabled = cpwildcard;
+ 
++    android_disable_tags();
++
+     InitLauncher(javaw);
+     DumpState();
+     if (JLI_IsTraceLauncher()) {
 diff --git a/src/java.base/unix/native/libjava/jni_util_md.c b/src/java.base/unix/native/libjava/jni_util_md.c
 index 460503cd7..193480e73 100644
 --- a/src/java.base/unix/native/libjava/jni_util_md.c
@@ -2310,7 +2356,7 @@ index 9df8be1e6..12f9b4de3 100644
  typedef int futimens_func(int, const struct timespec *);
  typedef int lutimes_func(const char *, const struct timeval *);
  typedef DIR* fdopendir_func(int);
-@@ -149,10 +150,46 @@ static fstatat64_func* my_fstatat64_func = NULL;
+@@ -149,13 +150,48 @@ static fstatat64_func* my_fstatat64_func = NULL;
  static unlinkat_func* my_unlinkat_func = NULL;
  static renameat_func* my_renameat_func = NULL;
  static futimesat_func* my_futimesat_func = NULL;
@@ -2318,7 +2364,9 @@ index 9df8be1e6..12f9b4de3 100644
  static futimens_func* my_futimens_func = NULL;
  static lutimes_func* my_lutimes_func = NULL;
  static fdopendir_func* my_fdopendir_func = NULL;
- 
+ #if defined(__linux__)
+ static statx_func* my_statx_func = NULL;
+ #endif
 +#ifdef __ANDROID__
 +/*
 + * TODO: Android lacks support for the methods listed below.  In it's place are
@@ -2353,7 +2401,7 @@ index 9df8be1e6..12f9b4de3 100644
 +
 +}
 +#endif
-+
+
  /**
   * fstatat missing from glibc on Linux.
   */
@@ -2509,3 +2557,14 @@ index 3fb38893e..20ac7b270 100644
          }
  
          if (codeset == NULL) {
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+index be578a0bb..ce5e8b400 100644
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -80,5 +80,5 @@
+ // not relying on included headers.
+ 
+-#ifndef __GLIBC__
++#if !defined(__GLIBC__) && !defined(__ANDROID__)
+ // Alpine doesn't know these types, define them
+ typedef unsigned int       __uint32_t;
